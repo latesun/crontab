@@ -6,6 +6,7 @@ import (
 
 	"github.com/latesun/crontab/common"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // mongodb存储日志
@@ -77,15 +78,9 @@ func (logSink *LogSink) writeLoop() {
 }
 
 func InitLogSink() (err error) {
-	var (
-		client *mongo.Client
-	)
-
-	// 建立mongodb连接
-	if client, err = mongo.Connect(
-		context.TODO(),
-		G_config.MongodbUri,
-		clientopt.ConnectTimeout(time.Duration(G_config.MongodbConnectTimeout)*time.Millisecond)); err != nil {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(G_config.MongodbUri))
+	if err != nil {
 		return
 	}
 
