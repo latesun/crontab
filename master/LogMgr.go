@@ -10,23 +10,21 @@ import (
 )
 
 // mongodb日志管理
-type LogMgr struct {
+type logMgr struct {
 	client        *mongo.Client
 	logCollection *mongo.Collection
 }
 
-var (
-	G_logMgr *LogMgr
-)
+var LogMgr *logMgr
 
 func InitLogMgr() (err error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(G_config.MongodbUri))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(Config.MongodbUri))
 	if err != nil {
 		return
 	}
 
-	G_logMgr = &LogMgr{
+	LogMgr = &logMgr{
 		client:        client,
 		logCollection: client.Database("cron").Collection("log"),
 	}
@@ -34,7 +32,7 @@ func InitLogMgr() (err error) {
 }
 
 // 查看任务日志
-func (logMgr *LogMgr) ListLog(name string, skip int, limit int) (logArr []*common.JobLog, err error) {
+func (l *logMgr) ListLog(name string, skip int, limit int) (logArr []*common.JobLog, err error) {
 	var (
 		filter *common.JobLogFilter
 		cur    *mongo.Cursor
@@ -52,7 +50,7 @@ func (logMgr *LogMgr) ListLog(name string, skip int, limit int) (logArr []*commo
 	findOption.SetSort(common.SortLogByStartTime{SortOrder: -1})
 
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	cur, err = logMgr.logCollection.Find(ctx, filter, findOption)
+	cur, err = l.logCollection.Find(ctx, filter, findOption)
 	if err != nil {
 		return
 	}

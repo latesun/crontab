@@ -9,22 +9,18 @@ import (
 )
 
 // 任务执行器
-type Executor struct {
-}
+type executor struct{}
 
-var (
-	G_executor *Executor
-)
+var Executor *executor
 
 // 执行一个任务
-func (executor *Executor) ExecuteJob(info *common.JobExecuteInfo) {
+func (e *executor) ExecuteJob(info *common.JobExecuteInfo) {
 	go func() {
 		var (
-			cmd     *exec.Cmd
-			err     error
-			output  []byte
-			result  *common.JobExecuteResult
-			jobLock *JobLock
+			cmd    *exec.Cmd
+			err    error
+			output []byte
+			result *common.JobExecuteResult
 		)
 
 		// 任务结果
@@ -34,7 +30,7 @@ func (executor *Executor) ExecuteJob(info *common.JobExecuteInfo) {
 		}
 
 		// 初始化分布式锁
-		jobLock = G_jobMgr.CreateJobLock(info.Job.Name)
+		jobLock := JobMgr.CreateJobLock(info.Job.Name)
 
 		// 记录任务开始时间
 		result.StartTime = time.Now()
@@ -65,12 +61,12 @@ func (executor *Executor) ExecuteJob(info *common.JobExecuteInfo) {
 			result.Err = err
 		}
 		// 任务执行完成后，把执行的结果返回给Scheduler，Scheduler会从executingTable中删除掉执行记录
-		G_scheduler.PushJobResult(result)
+		Scheduler.PushJobResult(result)
 	}()
 }
 
 //  初始化执行器
 func InitExecutor() (err error) {
-	G_executor = &Executor{}
+	Executor = &executor{}
 	return
 }

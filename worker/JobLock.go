@@ -8,29 +8,32 @@ import (
 )
 
 // 分布式锁(TXN事务)
-type JobLock struct {
+type jobLock struct {
 	// etcd客户端
 	kv    clientv3.KV
 	lease clientv3.Lease
 
 	jobName    string             // 任务名
 	cancelFunc context.CancelFunc // 用于终止自动续租
-	leaseId    clientv3.LeaseID   // 租约ID
+	leaseID    clientv3.LeaseID   // 租约ID
 	isLocked   bool               // 是否上锁成功
 }
 
+var JobLock *jobLock
+
 // 初始化一把锁
-func InitJobLock(jobName string, kv clientv3.KV, lease clientv3.Lease) (jobLock *JobLock) {
-	jobLock = &JobLock{
+func InitJobLock(jobName string, kv clientv3.KV, lease clientv3.Lease) *jobLock {
+	JobLock = &jobLock{
 		kv:      kv,
 		lease:   lease,
 		jobName: jobName,
 	}
-	return
+
+	return JobLock
 }
 
 // 尝试上锁
-func (jobLock *JobLock) TryLock() (err error) {
+func (lock *jobLock) TryLock() (err error) {
 	var (
 		leaseGrantResp *clientv3.LeaseGrantResponse
 		cancelCtx      context.Context
@@ -43,7 +46,7 @@ func (jobLock *JobLock) TryLock() (err error) {
 	)
 
 	// 1, 创建租约(5秒)
-	if leaseGrantResp, err = jobLock.lease.Grant(context.TODO(), 5); err != nil {
+	if leaseGrantResp, err = lock.lease.Grant(context.TODO(), 5); err != nil {
 		return
 	}
 
@@ -54,7 +57,7 @@ func (jobLock *JobLock) TryLock() (err error) {
 	leaseId = leaseGrantResp.ID
 
 	// 2, 自动续租
-	if keepRespChan, err = jobLock.lease.KeepAlive(cancelCtx, leaseId); err != nil {
+	if keepRespChan, err = lock.lease.KeepAlive(cancelCtx, leaseId); err != nil {
 		goto FAIL
 	}
 
@@ -75,10 +78,10 @@ func (jobLock *JobLock) TryLock() (err error) {
 	}()
 
 	// 4, 创建事务txn
-	txn = jobLock.kv.Txn(context.TODO())
+	txn = lock.kv.Txn(context.TODO())
 
 	// 锁路径
-	lockKey = common.JOB_LOCK_DIR + jobLock.jobName
+	lockKey = common.JOB_LOCK_DIR + lock.jobName
 
 	// 5, 事务抢锁
 	txn.If(clientv3.Compare(clientv3.CreateRevision(lockKey), "=", 0)).
@@ -97,21 +100,21 @@ func (jobLock *JobLock) TryLock() (err error) {
 	}
 
 	// 抢锁成功
-	jobLock.leaseId = leaseId
-	jobLock.cancelFunc = cancelFunc
-	jobLock.isLocked = true
+	lock.leaseID = leaseId
+	lock.cancelFunc = cancelFunc
+	lock.isLocked = true
 	return
 
 FAIL:
-	cancelFunc()                                  // 取消自动续租
-	jobLock.lease.Revoke(context.TODO(), leaseId) //  释放租约
+	cancelFunc()                               // 取消自动续租
+	lock.lease.Revoke(context.TODO(), leaseId) //  释放租约
 	return
 }
 
 // 释放锁
-func (jobLock *JobLock) Unlock() {
-	if jobLock.isLocked {
-		jobLock.cancelFunc()                                  // 取消我们程序自动续租的协程
-		jobLock.lease.Revoke(context.TODO(), jobLock.leaseId) // 释放租约
+func (lock *jobLock) Unlock() {
+	if lock.isLocked {
+		lock.cancelFunc()                               // 取消我们程序自动续租的协程
+		lock.lease.Revoke(context.TODO(), lock.leaseID) // 释放租约
 	}
 }

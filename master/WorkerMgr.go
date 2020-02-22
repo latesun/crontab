@@ -10,18 +10,16 @@ import (
 )
 
 // /cron/workers/
-type WorkerMgr struct {
+type workerMgr struct {
 	client *clientv3.Client
 	kv     clientv3.KV
 	lease  clientv3.Lease
 }
 
-var (
-	G_workerMgr *WorkerMgr
-)
+var WorkerMgr *workerMgr
 
 // 获取在线worker列表
-func (workerMgr *WorkerMgr) ListWorkers() (workerArr []string, err error) {
+func (wm *workerMgr) ListWorkers() (workerArr []string, err error) {
 	var (
 		getResp  *clientv3.GetResponse
 		kv       *mvccpb.KeyValue
@@ -32,7 +30,7 @@ func (workerMgr *WorkerMgr) ListWorkers() (workerArr []string, err error) {
 	workerArr = make([]string, 0)
 
 	// 获取目录下所有Kv
-	if getResp, err = workerMgr.kv.Get(context.TODO(), common.JOB_WORKER_DIR, clientv3.WithPrefix()); err != nil {
+	if getResp, err = wm.kv.Get(context.TODO(), common.JOB_WORKER_DIR, clientv3.WithPrefix()); err != nil {
 		return
 	}
 
@@ -55,8 +53,8 @@ func InitWorkerMgr() (err error) {
 
 	// 初始化配置
 	config = clientv3.Config{
-		Endpoints:   G_config.EtcdEndpoints,                                     // 集群地址
-		DialTimeout: time.Duration(G_config.EtcdDialTimeout) * time.Millisecond, // 连接超时
+		Endpoints:   Config.EtcdEndpoints,                                     // 集群地址
+		DialTimeout: time.Duration(Config.EtcdDialTimeout) * time.Millisecond, // 连接超时
 	}
 
 	// 建立连接
@@ -68,7 +66,7 @@ func InitWorkerMgr() (err error) {
 	kv = clientv3.NewKV(client)
 	lease = clientv3.NewLease(client)
 
-	G_workerMgr = &WorkerMgr{
+	WorkerMgr = &workerMgr{
 		client: client,
 		kv:     kv,
 		lease:  lease,

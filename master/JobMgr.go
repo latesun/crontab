@@ -11,16 +11,13 @@ import (
 )
 
 // 任务管理器
-type JobMgr struct {
+type jobMgr struct {
 	client *clientv3.Client
 	kv     clientv3.KV
 	lease  clientv3.Lease
 }
 
-var (
-	// 单例
-	G_jobMgr *JobMgr
-)
+var JobMgr *jobMgr
 
 // 初始化管理器
 func InitJobMgr() (err error) {
@@ -33,8 +30,8 @@ func InitJobMgr() (err error) {
 
 	// 初始化配置
 	config = clientv3.Config{
-		Endpoints:   G_config.EtcdEndpoints,                                     // 集群地址
-		DialTimeout: time.Duration(G_config.EtcdDialTimeout) * time.Millisecond, // 连接超时
+		Endpoints:   Config.EtcdEndpoints,                                     // 集群地址
+		DialTimeout: time.Duration(Config.EtcdDialTimeout) * time.Millisecond, // 连接超时
 	}
 
 	// 建立连接
@@ -47,7 +44,7 @@ func InitJobMgr() (err error) {
 	lease = clientv3.NewLease(client)
 
 	// 赋值单例
-	G_jobMgr = &JobMgr{
+	JobMgr = &jobMgr{
 		client: client,
 		kv:     kv,
 		lease:  lease,
@@ -56,7 +53,7 @@ func InitJobMgr() (err error) {
 }
 
 // 保存任务
-func (jobMgr *JobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
+func (jm *jobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
 	// 把任务保存到/cron/jobs/任务名 -> json
 	var (
 		jobKey    string
@@ -72,7 +69,7 @@ func (jobMgr *JobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
 		return
 	}
 	// 保存到etcd
-	if putResp, err = jobMgr.kv.Put(context.TODO(), jobKey, string(jobValue), clientv3.WithPrevKV()); err != nil {
+	if putResp, err = jm.kv.Put(context.TODO(), jobKey, string(jobValue), clientv3.WithPrevKV()); err != nil {
 		return
 	}
 	// 如果是更新, 那么返回旧值
@@ -88,7 +85,7 @@ func (jobMgr *JobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
 }
 
 // 删除任务
-func (jobMgr *JobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
+func (jm *jobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
 	var (
 		jobKey    string
 		delResp   *clientv3.DeleteResponse
@@ -99,7 +96,7 @@ func (jobMgr *JobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
 	jobKey = common.JOB_SAVE_DIR + name
 
 	// 从etcd中删除它
-	if delResp, err = jobMgr.kv.Delete(context.TODO(), jobKey, clientv3.WithPrevKV()); err != nil {
+	if delResp, err = jm.kv.Delete(context.TODO(), jobKey, clientv3.WithPrevKV()); err != nil {
 		return
 	}
 
@@ -116,7 +113,7 @@ func (jobMgr *JobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
 }
 
 // 列举任务
-func (jobMgr *JobMgr) ListJobs() (jobList []*common.Job, err error) {
+func (jm *jobMgr) ListJobs() (jobList []*common.Job, err error) {
 	var (
 		dirKey  string
 		getResp *clientv3.GetResponse
@@ -128,7 +125,7 @@ func (jobMgr *JobMgr) ListJobs() (jobList []*common.Job, err error) {
 	dirKey = common.JOB_SAVE_DIR
 
 	// 获取目录下所有任务信息
-	if getResp, err = jobMgr.kv.Get(context.TODO(), dirKey, clientv3.WithPrefix()); err != nil {
+	if getResp, err = jm.kv.Get(context.TODO(), dirKey, clientv3.WithPrefix()); err != nil {
 		return
 	}
 
@@ -149,7 +146,7 @@ func (jobMgr *JobMgr) ListJobs() (jobList []*common.Job, err error) {
 }
 
 // 杀死任务
-func (jobMgr *JobMgr) KillJob(name string) (err error) {
+func (jm *jobMgr) KillJob(name string) (err error) {
 	// 更新一下key=/cron/killer/任务名
 	var (
 		killerKey      string
@@ -161,7 +158,7 @@ func (jobMgr *JobMgr) KillJob(name string) (err error) {
 	killerKey = common.JOB_KILLER_DIR + name
 
 	// 让worker监听到一次put操作, 创建一个租约让其稍后自动过期即可
-	if leaseGrantResp, err = jobMgr.lease.Grant(context.TODO(), 1); err != nil {
+	if leaseGrantResp, err = jm.lease.Grant(context.TODO(), 1); err != nil {
 		return
 	}
 
@@ -169,7 +166,7 @@ func (jobMgr *JobMgr) KillJob(name string) (err error) {
 	leaseId = leaseGrantResp.ID
 
 	// 设置killer标记
-	if _, err = jobMgr.kv.Put(context.TODO(), killerKey, "", clientv3.WithLease(leaseId)); err != nil {
+	if _, err = jm.kv.Put(context.TODO(), killerKey, "", clientv3.WithLease(leaseId)); err != nil {
 		return
 	}
 	return

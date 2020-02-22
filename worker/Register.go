@@ -10,7 +10,7 @@ import (
 )
 
 // 注册节点到etcd： /cron/workers/IP地址
-type Register struct {
+type register struct {
 	client *clientv3.Client
 	kv     clientv3.KV
 	lease  clientv3.Lease
@@ -18,9 +18,7 @@ type Register struct {
 	localIP string // 本机IP
 }
 
-var (
-	G_register *Register
-)
+var Register *register
 
 // 获取本机网卡IP
 func getLocalIP() (ipv4 string, err error) {
@@ -51,7 +49,7 @@ func getLocalIP() (ipv4 string, err error) {
 }
 
 // 注册到/cron/workers/IP, 并自动续租
-func (register *Register) keepOnline() {
+func (r *register) keepOnline() {
 	var (
 		regKey         string
 		leaseGrantResp *clientv3.LeaseGrantResponse
@@ -64,24 +62,24 @@ func (register *Register) keepOnline() {
 
 	for {
 		// 注册路径
-		regKey = common.JOB_WORKER_DIR + register.localIP
+		regKey = common.JOB_WORKER_DIR + r.localIP
 
 		cancelFunc = nil
 
 		// 创建租约
-		if leaseGrantResp, err = register.lease.Grant(context.TODO(), 10); err != nil {
+		if leaseGrantResp, err = r.lease.Grant(context.TODO(), 10); err != nil {
 			goto RETRY
 		}
 
 		// 自动续租
-		if keepAliveChan, err = register.lease.KeepAlive(context.TODO(), leaseGrantResp.ID); err != nil {
+		if keepAliveChan, err = r.lease.KeepAlive(context.TODO(), leaseGrantResp.ID); err != nil {
 			goto RETRY
 		}
 
 		cancelCtx, cancelFunc = context.WithCancel(context.TODO())
 
 		// 注册到etcd
-		if _, err = register.kv.Put(cancelCtx, regKey, "", clientv3.WithLease(leaseGrantResp.ID)); err != nil {
+		if _, err = r.kv.Put(cancelCtx, regKey, "", clientv3.WithLease(leaseGrantResp.ID)); err != nil {
 			goto RETRY
 		}
 
@@ -114,8 +112,8 @@ func InitRegister() (err error) {
 
 	// 初始化配置
 	config = clientv3.Config{
-		Endpoints:   G_config.EtcdEndpoints,                                     // 集群地址
-		DialTimeout: time.Duration(G_config.EtcdDialTimeout) * time.Millisecond, // 连接超时
+		Endpoints:   Config.EtcdEndpoints,                                     // 集群地址
+		DialTimeout: time.Duration(Config.EtcdDialTimeout) * time.Millisecond, // 连接超时
 	}
 
 	// 建立连接
@@ -132,7 +130,7 @@ func InitRegister() (err error) {
 	kv = clientv3.NewKV(client)
 	lease = clientv3.NewLease(client)
 
-	G_register = &Register{
+	Register = &register{
 		client:  client,
 		kv:      kv,
 		lease:   lease,
@@ -140,7 +138,7 @@ func InitRegister() (err error) {
 	}
 
 	// 服务注册
-	go G_register.keepOnline()
+	go Register.keepOnline()
 
 	return
 }

@@ -11,14 +11,18 @@ import (
 )
 
 // 任务的HTTP接口
-type ApiServer struct {
+type apiServer struct {
 	httpServer *http.Server
 }
 
 var (
 	// 单例对象
-	G_apiServer *ApiServer
+	G_apiServer *apiServer
 )
+
+func NewAPIServer(httpServer *http.Server) *apiServer {
+	return &apiServer{httpServer}
+}
 
 // 保存任务接口
 // POST job={"name": "job1", "command": "echo hello", "cronExpr": "* * * * *"}
@@ -37,12 +41,13 @@ func handleJobSave(resp http.ResponseWriter, req *http.Request) {
 	}
 	// 2, 取表单中的job字段
 	postJob = req.PostForm.Get("job")
+
 	// 3, 反序列化job
 	if err = json.Unmarshal([]byte(postJob), &job); err != nil {
 		goto ERR
 	}
 	// 4, 保存到etcd
-	if oldJob, err = G_jobMgr.SaveJob(&job); err != nil {
+	if oldJob, err = JobMgr.SaveJob(&job); err != nil {
 		goto ERR
 	}
 	// 5, 返回正常应答 ({"errno": 0, "msg": "", "data": {....}})
@@ -76,7 +81,7 @@ func handleJobDelete(resp http.ResponseWriter, req *http.Request) {
 	name = req.PostForm.Get("name")
 
 	// 去删除任务
-	if oldJob, err = G_jobMgr.DeleteJob(name); err != nil {
+	if oldJob, err = JobMgr.DeleteJob(name); err != nil {
 		goto ERR
 	}
 
@@ -101,7 +106,7 @@ func handleJobList(resp http.ResponseWriter, req *http.Request) {
 	)
 
 	// 获取任务列表
-	if jobList, err = G_jobMgr.ListJobs(); err != nil {
+	if jobList, err = JobMgr.ListJobs(); err != nil {
 		goto ERR
 	}
 
@@ -135,7 +140,7 @@ func handleJobKill(resp http.ResponseWriter, req *http.Request) {
 	name = req.PostForm.Get("name")
 
 	// 杀死任务
-	if err = G_jobMgr.KillJob(name); err != nil {
+	if err = JobMgr.KillJob(name); err != nil {
 		goto ERR
 	}
 
@@ -180,7 +185,7 @@ func handleJobLog(resp http.ResponseWriter, req *http.Request) {
 		limit = 20
 	}
 
-	if logArr, err = G_logMgr.ListLog(name, skip, limit); err != nil {
+	if logArr, err = LogMgr.ListLog(name, skip, limit); err != nil {
 		goto ERR
 	}
 
@@ -204,7 +209,7 @@ func handleWorkerList(resp http.ResponseWriter, req *http.Request) {
 		bytes     []byte
 	)
 
-	if workerArr, err = G_workerMgr.ListWorkers(); err != nil {
+	if workerArr, err = WorkerMgr.ListWorkers(); err != nil {
 		goto ERR
 	}
 
@@ -242,26 +247,26 @@ func InitApiServer() (err error) {
 	//  /index.html
 
 	// 静态文件目录
-	staticDir = http.Dir(G_config.WebRoot)
+	staticDir = http.Dir(Config.WebRoot)
 	staticHandler = http.FileServer(staticDir)
 	mux.Handle("/", http.StripPrefix("/", staticHandler)) //   ./webroot/index.html
 
 	// 启动TCP监听
-	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(G_config.ApiPort)); err != nil {
+	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(Config.ApiPort)); err != nil {
 		return
 	}
 
 	// 创建一个HTTP服务
 	httpServer = &http.Server{
-		ReadTimeout:  time.Duration(G_config.ApiReadTimeout) * time.Millisecond,
-		WriteTimeout: time.Duration(G_config.ApiWriteTimeout) * time.Millisecond,
+		ReadTimeout:  time.Duration(Config.ApiReadTimeout) * time.Millisecond,
+		WriteTimeout: time.Duration(Config.ApiWriteTimeout) * time.Millisecond,
 		Handler:      mux,
 	}
 
 	// 赋值单例
-	G_apiServer = &ApiServer{
-		httpServer: httpServer,
-	}
+	// G_apiServer = &apiServer{
+	// 	httpServer: httpServer,
+	// }
 
 	// 启动了服务端
 	go httpServer.Serve(listener)
