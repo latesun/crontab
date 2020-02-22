@@ -5,9 +5,7 @@ import (
 	"time"
 
 	"github.com/latesun/crontab/common"
-	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/mongodb/mongo-go-driver/mongo/clientopt"
-	"github.com/mongodb/mongo-go-driver/mongo/findopt"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // mongodb日志管理
