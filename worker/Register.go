@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/latesun/crontab/common"
+	"go.etcd.io/etcd/clientv3"
 )
 
 // 注册节点到etcd： /cron/workers/IP地址

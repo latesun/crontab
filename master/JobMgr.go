@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/latesun/crontab/common"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 // 任务管理器

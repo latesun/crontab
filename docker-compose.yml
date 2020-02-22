@@ -1,0 +1,70 @@
+version: '3.1'
+
+services:
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+     - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    networks:
+     - crontab
+
+  mongo-express:
+    image: mongo-express 
+    restart: always
+    ports:
+     - 8081:8081
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    networks:
+      - crontab
+
+  etcd1:
+    image: quay.io/coreos/etcd
+    container_name: etcd1
+    ports:
+     - 12379:2379
+     - 2380
+    environment:
+      ETCDCTL_API: 3
+    volumes:
+     - $HOME/data/etcd/etcd-data:/etcd-data
+    command: etcd -name etcd1 -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 -listen-peer-urls http://0.0.0.0:2380 -initial-cluster-token etcd-cluster -initial-cluster "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380" -initial-cluster-state new
+    networks:
+      - crontab
+
+  etcd2:
+    image: quay.io/coreos/etcd
+    container_name: etcd2
+    ports:
+     - 22379:2379
+     - 2380
+    environment:
+      ETCDCTL_API: 3
+    volumes:
+     - $HOME/data/etcd/etcd-data:/etcd-data
+    command: etcd -name etcd2 -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 -listen-peer-urls http://0.0.0.0:2380 -initial-cluster-token etcd-cluster -initial-cluster "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380" -initial-cluster-state new
+    networks:
+     - crontab
+
+  etcd3:
+    image: quay.io/coreos/etcd
+    container_name: etcd3
+    ports:
+     - 32379:2379
+     - 2380
+    environment:
+      ETCDCTL_API: 3
+    volumes:
+     - $HOME/data/etcd/etcd-data:/etcd-data
+    command: etcd -name etcd3 -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 -listen-peer-urls http://0.0.0.0:2380 -initial-cluster-token etcd-cluster -initial-cluster "etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380" -initial-cluster-state new
+    networks:
+     - crontab
+
+networks:
+  crontab:
+    external: true
