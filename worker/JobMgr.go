@@ -1,18 +1,19 @@
 package worker
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	"time"
 	"context"
-	"github.com/owenliang/crontab/common"
-	"github.com/coreos/etcd/mvcc/mvccpb"
+	"time"
+
+	"github.com/latesun/crontab/common"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 // 任务管理器
 type JobMgr struct {
-	client *clientv3.Client
-	kv clientv3.KV
-	lease clientv3.Lease
+	client  *clientv3.Client
+	kv      clientv3.KV
+	lease   clientv3.Lease
 	watcher clientv3.Watcher
 }
 
@@ -24,15 +25,15 @@ var (
 // 监听任务变化
 func (jobMgr *JobMgr) watchJobs() (err error) {
 	var (
-		getResp *clientv3.GetResponse
-		kvpair *mvccpb.KeyValue
-		job *common.Job
+		getResp            *clientv3.GetResponse
+		kvpair             *mvccpb.KeyValue
+		job                *common.Job
 		watchStartRevision int64
-		watchChan clientv3.WatchChan
-		watchResp clientv3.WatchResponse
-		watchEvent *clientv3.Event
-		jobName string
-		jobEvent *common.JobEvent
+		watchChan          clientv3.WatchChan
+		watchResp          clientv3.WatchResponse
+		watchEvent         *clientv3.Event
+		jobName            string
+		jobEvent           *common.JobEvent
 	)
 
 	// 1, get一下/cron/jobs/目录下的所有任务，并且获知当前集群的revision
@@ -86,12 +87,12 @@ func (jobMgr *JobMgr) watchJobs() (err error) {
 // 监听强杀任务通知
 func (jobMgr *JobMgr) watchKiller() {
 	var (
-		watchChan clientv3.WatchChan
-		watchResp clientv3.WatchResponse
+		watchChan  clientv3.WatchChan
+		watchResp  clientv3.WatchResponse
 		watchEvent *clientv3.Event
-		jobEvent *common.JobEvent
-		jobName string
-		job *common.Job
+		jobEvent   *common.JobEvent
+		jobName    string
+		job        *common.Job
 	)
 	// 监听/cron/killer目录
 	go func() { // 监听协程
@@ -117,16 +118,16 @@ func (jobMgr *JobMgr) watchKiller() {
 // 初始化管理器
 func InitJobMgr() (err error) {
 	var (
-		config clientv3.Config
-		client *clientv3.Client
-		kv clientv3.KV
-		lease clientv3.Lease
+		config  clientv3.Config
+		client  *clientv3.Client
+		kv      clientv3.KV
+		lease   clientv3.Lease
 		watcher clientv3.Watcher
 	)
 
 	// 初始化配置
 	config = clientv3.Config{
-		Endpoints: G_config.EtcdEndpoints, // 集群地址
+		Endpoints:   G_config.EtcdEndpoints,                                     // 集群地址
 		DialTimeout: time.Duration(G_config.EtcdDialTimeout) * time.Millisecond, // 连接超时
 	}
 
@@ -142,9 +143,9 @@ func InitJobMgr() (err error) {
 
 	// 赋值单例
 	G_jobMgr = &JobMgr{
-		client: client,
-		kv: kv,
-		lease: lease,
+		client:  client,
+		kv:      kv,
+		lease:   lease,
 		watcher: watcher,
 	}
 
@@ -158,7 +159,7 @@ func InitJobMgr() (err error) {
 }
 
 // 创建任务执行锁
-func (jobMgr *JobMgr) CreateJobLock(jobName string) (jobLock *JobLock){
+func (jobMgr *JobMgr) CreateJobLock(jobName string) (jobLock *JobLock) {
 	jobLock = InitJobLock(jobName, jobMgr.kv, jobMgr.lease)
 	return
 }
