@@ -34,80 +34,66 @@ func InitJobLock(jobName string, kv clientv3.KV, lease clientv3.Lease) *jobLock 
 
 // 尝试上锁
 func (lock *jobLock) TryLock() (err error) {
-	var (
-		leaseGrantResp *clientv3.LeaseGrantResponse
-		cancelCtx      context.Context
-		cancelFunc     context.CancelFunc
-		leaseId        clientv3.LeaseID
-		keepRespChan   <-chan *clientv3.LeaseKeepAliveResponse
-		txn            clientv3.Txn
-		lockKey        string
-		txnResp        *clientv3.TxnResponse
-	)
-
 	// 1, 创建租约(5秒)
-	if leaseGrantResp, err = lock.lease.Grant(context.TODO(), 5); err != nil {
+	grant, err := lock.lease.Grant(context.TODO(), 5)
+	if err != nil {
 		return
 	}
 
 	// context用于取消自动续租
-	cancelCtx, cancelFunc = context.WithCancel(context.TODO())
-
-	// 租约ID
-	leaseId = leaseGrantResp.ID
+	cancelCtx, cancelFunc := context.WithCancel(context.TODO())
 
 	// 2, 自动续租
-	if keepRespChan, err = lock.lease.KeepAlive(cancelCtx, leaseId); err != nil {
-		goto FAIL
+	keep, err := lock.lease.KeepAlive(cancelCtx, grant.ID)
+	if err != nil {
+		cancelFunc()                                // 取消自动续租
+		lock.lease.Revoke(context.TODO(), grant.ID) //  释放租约
+		return
 	}
 
 	// 3, 处理续租应答的协程
 	go func() {
-		var (
-			keepResp *clientv3.LeaseKeepAliveResponse
-		)
 		for {
 			select {
-			case keepResp = <-keepRespChan: // 自动续租的应答
-				if keepResp == nil {
-					goto END
+			case <-keep: // 自动续租的应答
+				if keep == nil {
+					break
 				}
 			}
 		}
-	END:
 	}()
 
 	// 4, 创建事务txn
-	txn = lock.kv.Txn(context.TODO())
+	txn := lock.kv.Txn(context.TODO())
 
 	// 锁路径
-	lockKey = common.JOB_LOCK_DIR + lock.jobName
+	lockKey := common.JOB_LOCK_DIR + lock.jobName
 
 	// 5, 事务抢锁
 	txn.If(clientv3.Compare(clientv3.CreateRevision(lockKey), "=", 0)).
-		Then(clientv3.OpPut(lockKey, "", clientv3.WithLease(leaseId))).
+		Then(clientv3.OpPut(lockKey, "", clientv3.WithLease(grant.ID))).
 		Else(clientv3.OpGet(lockKey))
 
 	// 提交事务
-	if txnResp, err = txn.Commit(); err != nil {
-		goto FAIL
+	txnResp, err := txn.Commit()
+	if err != nil {
+		cancelFunc()                                // 取消自动续租
+		lock.lease.Revoke(context.TODO(), grant.ID) //  释放租约
+		return
 	}
 
 	// 6, 成功返回, 失败释放租约
 	if !txnResp.Succeeded { // 锁被占用
 		err = common.ERR_LOCK_ALREADY_REQUIRED
-		goto FAIL
+		cancelFunc()                                // 取消自动续租
+		lock.lease.Revoke(context.TODO(), grant.ID) //  释放租约
+		return
 	}
 
 	// 抢锁成功
-	lock.leaseID = leaseId
+	lock.leaseID = grant.ID
 	lock.cancelFunc = cancelFunc
 	lock.isLocked = true
-	return
-
-FAIL:
-	cancelFunc()                               // 取消自动续租
-	lock.lease.Revoke(context.TODO(), leaseId) //  释放租约
 	return
 }
 

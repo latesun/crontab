@@ -26,16 +26,16 @@ func (s *logSink) saveLogs(batch *common.LogBatch) {
 
 // 日志存储协程
 func (s *logSink) writeLoop() {
-	var (
-		log          *common.JobLog
-		logBatch     *common.LogBatch // 当前的批次
-		commitTimer  *time.Timer
-		timeoutBatch *common.LogBatch // 超时批次
-	)
+	// var (
+	// 	log          *common.JobLog
+	var logBatch *common.LogBatch // 当前的批次
+	var commitTimer *time.Timer
+	// 	timeoutBatch *common.LogBatch // 超时批次
+	// )
 
 	for {
 		select {
-		case log = <-s.logChan:
+		case log := <-s.logChan:
 			if logBatch == nil {
 				logBatch = &common.LogBatch{}
 				// 让这个批次超时自动提交(给1秒的时间）
@@ -61,7 +61,7 @@ func (s *logSink) writeLoop() {
 				// 取消定时器
 				commitTimer.Stop()
 			}
-		case timeoutBatch = <-s.autoCommitChan: // 过期的批次
+		case timeoutBatch := <-s.autoCommitChan: // 过期的批次
 			// 判断过期批次是否仍旧是当前的批次
 			if timeoutBatch != logBatch {
 				continue // 跳过已经被提交的批次

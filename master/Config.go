@@ -40,3 +40,5 @@ func InitConfig(filename string) (err error) {
 
 	return
 }
+
+// TODO: 用 viper 替换原生的配置文件读取

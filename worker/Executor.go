@@ -16,15 +16,8 @@ var Executor *executor
 // 执行一个任务
 func (e *executor) ExecuteJob(info *common.JobExecuteInfo) {
 	go func() {
-		var (
-			cmd    *exec.Cmd
-			err    error
-			output []byte
-			result *common.JobExecuteResult
-		)
-
 		// 任务结果
-		result = &common.JobExecuteResult{
+		result := &common.JobExecuteResult{
 			ExecuteInfo: info,
 			Output:      make([]byte, 0),
 		}
@@ -39,7 +32,7 @@ func (e *executor) ExecuteJob(info *common.JobExecuteInfo) {
 		// 随机睡眠(0~1s)
 		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 
-		err = jobLock.TryLock()
+		err := jobLock.TryLock()
 		defer jobLock.Unlock()
 
 		if err != nil { // 上锁失败
@@ -50,10 +43,10 @@ func (e *executor) ExecuteJob(info *common.JobExecuteInfo) {
 			result.StartTime = time.Now()
 
 			// 执行shell命令
-			cmd = exec.CommandContext(info.CancelCtx, "/bin/bash", "-c", info.Job.Command)
+			cmd := exec.CommandContext(info.CancelCtx, "/bin/bash", "-c", info.Job.Command)
 
 			// 执行并捕获输出
-			output, err = cmd.CombinedOutput()
+			output, err := cmd.CombinedOutput()
 
 			// 记录任务结束时间
 			result.EndTime = time.Now()

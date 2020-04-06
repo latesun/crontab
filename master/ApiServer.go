@@ -17,7 +17,7 @@ func listJobs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"jobs": jobs})
+	c.JSON(http.StatusOK, gin.H{"data": jobs, "errno": 0})
 }
 
 // 保存任务接口
@@ -35,7 +35,7 @@ func saveJob(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": oldJob})
+	c.JSON(http.StatusOK, gin.H{"errno": 0, "data": oldJob})
 }
 
 // 删除任务接口
@@ -49,7 +49,7 @@ func deleteJob(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success", "job": oldJob})
+	c.JSON(http.StatusOK, gin.H{"errno": 0, "job": oldJob})
 }
 
 // 强制杀死某个任务
@@ -61,7 +61,7 @@ func killJob(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
+	c.JSON(http.StatusOK, gin.H{"errno": 0, "status": "success"})
 }
 
 // 查询任务日志
@@ -87,7 +87,7 @@ func listLogs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"logs": logs})
+	c.JSON(http.StatusOK, gin.H{"errno": 0, "data": logs})
 }
 
 // 查看健康 worker 节点
@@ -99,7 +99,7 @@ func listWorkers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"workers": workers})
+	c.JSON(http.StatusOK, gin.H{"errno": 0, "data": workers})
 }
 
 func APIGateway() {

@@ -22,20 +22,16 @@ func initArgs() {
 }
 
 // 初始化线程数量
-func initEnv() {
+func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	flag.StringVar(&confFile, "config", "./worker.json", "worker.json")
+	flag.Parse()
 }
 
 func main() {
 	var (
 		err error
 	)
-
-	// 初始化命令行参数
-	initArgs()
-
-	// 初始化线程
-	initEnv()
 
 	// 加载配置
 	if err = worker.InitConfig(confFile); err != nil {

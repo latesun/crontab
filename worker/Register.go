@@ -11,34 +11,29 @@ import (
 
 // 注册节点到etcd： /cron/workers/IP地址
 type register struct {
-	client *clientv3.Client
-	kv     clientv3.KV
-	lease  clientv3.Lease
-
-	localIP string // 本机IP
+	client  *clientv3.Client
+	kv      clientv3.KV
+	lease   clientv3.Lease
+	localIP string
 }
 
 var Register *register
 
 // 获取本机网卡IP
 func getLocalIP() (ipv4 string, err error) {
-	var (
-		addrs   []net.Addr
-		addr    net.Addr
-		ipNet   *net.IPNet // IP地址
-		isIpNet bool
-	)
-	// 获取所有网卡
-	if addrs, err = net.InterfaceAddrs(); err != nil {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
 		return
 	}
+
 	// 取第一个非lo的网卡IP
-	for _, addr = range addrs {
+	for _, addr := range addrs {
 		// 这个网络地址是IP地址: ipv4, ipv6
-		if ipNet, isIpNet = addr.(*net.IPNet); isIpNet && !ipNet.IP.IsLoopback() {
+		ipNet, isIpNet := addr.(*net.IPNet)
+		if isIpNet && !ipNet.IP.IsLoopback() {
 			// 跳过IPV6
 			if ipNet.IP.To4() != nil {
-				ipv4 = ipNet.IP.String() // 192.168.1.1
+				ipv4 = ipNet.IP.String()
 				return
 			}
 		}
@@ -102,33 +97,24 @@ func (r *register) keepOnline() {
 }
 
 func InitRegister() (err error) {
-	var (
-		config  clientv3.Config
-		client  *clientv3.Client
-		kv      clientv3.KV
-		lease   clientv3.Lease
-		localIp string
-	)
-
-	// 初始化配置
-	config = clientv3.Config{
+	// 建立连接
+	client, err := clientv3.New(clientv3.Config{
 		Endpoints:   Config.EtcdEndpoints,                                     // 集群地址
 		DialTimeout: time.Duration(Config.EtcdDialTimeout) * time.Millisecond, // 连接超时
-	}
-
-	// 建立连接
-	if client, err = clientv3.New(config); err != nil {
+	})
+	if err != nil {
 		return
 	}
 
 	// 本机IP
-	if localIp, err = getLocalIP(); err != nil {
+	localIp, err := getLocalIP()
+	if err != nil {
 		return
 	}
 
 	// 得到KV和Lease的API子集
-	kv = clientv3.NewKV(client)
-	lease = clientv3.NewLease(client)
+	kv := clientv3.NewKV(client)
+	lease := clientv3.NewLease(client)
 
 	Register = &register{
 		client:  client,

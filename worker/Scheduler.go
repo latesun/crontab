@@ -19,27 +19,31 @@ var Scheduler *scheduler
 
 // 处理任务事件
 func (s *scheduler) handleJobEvent(jobEvent *common.JobEvent) {
+	// var (
 	var (
 		jobSchedulePlan *common.JobSchedulePlan
-		jobExecuteInfo  *common.JobExecuteInfo
-		jobExecuting    bool
-		jobExisted      bool
-		err             error
+		// 	jobExecuteInfo  *common.JobExecuteInfo
+		// 	jobExecuting    bool
+		jobExisted bool
+		err        error
 	)
 
 	switch jobEvent.EventType {
 	case common.JOB_EVENT_SAVE: // 保存任务事件
-		if jobSchedulePlan, err = common.BuildJobSchedulePlan(jobEvent.Job); err != nil {
+		jobSchedulePlan, err = common.BuildJobSchedulePlan(jobEvent.Job)
+		if err != nil {
 			return
 		}
 		s.jobPlanTable[jobEvent.Job.Name] = jobSchedulePlan
 	case common.JOB_EVENT_DELETE: // 删除任务事件
-		if jobSchedulePlan, jobExisted = s.jobPlanTable[jobEvent.Job.Name]; jobExisted {
+		jobSchedulePlan, jobExisted = s.jobPlanTable[jobEvent.Job.Name]
+		if jobExisted {
 			delete(s.jobPlanTable, jobEvent.Job.Name)
 		}
 	case common.JOB_EVENT_KILL: // 强杀任务事件
 		// 取消掉Command执行, 判断任务是否在执行中
-		if jobExecuteInfo, jobExecuting = s.jobExecutingTable[jobEvent.Job.Name]; jobExecuting {
+		jobExecuteInfo, jobExecuting := s.jobExecutingTable[jobEvent.Job.Name]
+		if jobExecuting {
 			jobExecuteInfo.CancelFunc() // 触发command杀死shell子进程, 任务得到退出
 		}
 	}
@@ -48,15 +52,12 @@ func (s *scheduler) handleJobEvent(jobEvent *common.JobEvent) {
 // 尝试执行任务
 func (s *scheduler) TryStartJob(jobPlan *common.JobSchedulePlan) {
 	// 调度 和 执行 是2件事情
-	var (
-		jobExecuteInfo *common.JobExecuteInfo
-		jobExecuting   bool
-	)
 
 	// 执行的任务可能运行很久, 1分钟会调度60次，但是只能执行1次, 防止并发！
 
 	// 如果任务正在执行，跳过本次调度
-	if jobExecuteInfo, jobExecuting = s.jobExecutingTable[jobPlan.Job.Name]; jobExecuting {
+	jobExecuteInfo, jobExecuting := s.jobExecutingTable[jobPlan.Job.Name]
+	if jobExecuting {
 		// fmt.Println("尚未退出,跳过执行:", jobPlan.Job.Name)
 		return
 	}
@@ -74,12 +75,6 @@ func (s *scheduler) TryStartJob(jobPlan *common.JobSchedulePlan) {
 
 // 重新计算任务调度状态
 func (s *scheduler) TrySchedule() (scheduleAfter time.Duration) {
-	var (
-		jobPlan  *common.JobSchedulePlan
-		now      time.Time
-		nearTime *time.Time
-	)
-
 	// 如果任务表为空话，随便睡眠多久
 	if len(s.jobPlanTable) == 0 {
 		scheduleAfter = 1 * time.Second
@@ -87,10 +82,11 @@ func (s *scheduler) TrySchedule() (scheduleAfter time.Duration) {
 	}
 
 	// 当前时间
-	now = time.Now()
+	now := time.Now()
 
+	var nearTime *time.Time
 	// 遍历所有任务
-	for _, jobPlan = range s.jobPlanTable {
+	for _, jobPlan := range s.jobPlanTable {
 		if jobPlan.NextTime.Before(now) || jobPlan.NextTime.Equal(now) {
 			s.TryStartJob(jobPlan)
 			jobPlan.NextTime = jobPlan.Expr.Next(now) // 更新下次执行时间
@@ -108,9 +104,8 @@ func (s *scheduler) TrySchedule() (scheduleAfter time.Duration) {
 
 // 处理任务结果
 func (s *scheduler) handleJobResult(result *common.JobExecuteResult) {
-	var (
-		jobLog *common.JobLog
-	)
+	var jobLog *common.JobLog
+
 	// 删除执行状态
 	delete(s.jobExecutingTable, result.ExecuteInfo.Job.Name)
 

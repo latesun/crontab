@@ -32,25 +32,18 @@ func InitLogMgr() (err error) {
 }
 
 // 查看任务日志
-func (l *logMgr) ListLog(name string, skip int, limit int) (logArr []*common.JobLog, err error) {
-	var (
-		filter *common.JobLogFilter
-		cur    *mongo.Cursor
-		jobLog *common.JobLog
-	)
-
-	// len(logArr)
-	logArr = make([]*common.JobLog, 0)
+func (l *logMgr) ListLog(name string, skip int, limit int) (logs []*common.JobLog, err error) {
+	logs = make([]*common.JobLog, 0)
 
 	// 过滤条件
-	filter = &common.JobLogFilter{JobName: name}
+	filter := &common.JobLogFilter{JobName: name}
 
 	// 按照任务开始时间倒排
 	findOption := options.Find()
 	findOption.SetSort(common.SortLogByStartTime{SortOrder: -1})
 
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	cur, err = l.logCollection.Find(ctx, filter, findOption)
+	cur, err := l.logCollection.Find(ctx, filter, findOption)
 	if err != nil {
 		return
 	}
@@ -59,14 +52,14 @@ func (l *logMgr) ListLog(name string, skip int, limit int) (logArr []*common.Job
 	defer cur.Close(ctx)
 
 	for cur.Next(ctx) {
-		jobLog = &common.JobLog{}
+		jobLog := &common.JobLog{}
 
 		// 反序列化BSON
 		if err = cur.Decode(jobLog); err != nil {
 			continue // 有日志不合法
 		}
 
-		logArr = append(logArr, jobLog)
+		logs = append(logs, jobLog)
 	}
 	return
 }
