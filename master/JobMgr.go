@@ -7,7 +7,6 @@ import (
 
 	"github.com/latesun/crontab/common"
 	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 // 任务管理器
@@ -21,27 +20,21 @@ var JobMgr *jobMgr
 
 // 初始化管理器
 func InitJobMgr() (err error) {
-	var (
-		config clientv3.Config
-		client *clientv3.Client
-		kv     clientv3.KV
-		lease  clientv3.Lease
-	)
-
 	// 初始化配置
-	config = clientv3.Config{
+	config := clientv3.Config{
 		Endpoints:   Config.EtcdEndpoints,                                     // 集群地址
 		DialTimeout: time.Duration(Config.EtcdDialTimeout) * time.Millisecond, // 连接超时
 	}
 
 	// 建立连接
-	if client, err = clientv3.New(config); err != nil {
+	client, err := clientv3.New(config)
+	if err != nil {
 		return
 	}
 
 	// 得到KV和Lease的API子集
-	kv = clientv3.NewKV(client)
-	lease = clientv3.NewLease(client)
+	kv := clientv3.NewKV(client)
+	lease := clientv3.NewLease(client)
 
 	// 赋值单例
 	JobMgr = &jobMgr{
@@ -49,30 +42,30 @@ func InitJobMgr() (err error) {
 		kv:     kv,
 		lease:  lease,
 	}
+
 	return
 }
 
 // 保存任务
 func (jm *jobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
 	// 把任务保存到/cron/jobs/任务名 -> json
-	var (
-		jobKey    string
-		jobValue  []byte
-		putResp   *clientv3.PutResponse
-		oldJobObj common.Job
-	)
 
 	// etcd的保存key
-	jobKey = common.JOB_SAVE_DIR + job.Name
+	jobKey := common.JOB_SAVE_DIR + job.Name
 	// 任务信息json
-	if jobValue, err = json.Marshal(job); err != nil {
+	jobValue, err := json.Marshal(job)
+	if err != nil {
 		return
 	}
+
 	// 保存到etcd
-	if putResp, err = jm.kv.Put(context.TODO(), jobKey, string(jobValue), clientv3.WithPrevKV()); err != nil {
+	putResp, err := jm.kv.Put(context.TODO(), jobKey, string(jobValue), clientv3.WithPrevKV())
+	if err != nil {
 		return
 	}
+
 	// 如果是更新, 那么返回旧值
+	var oldJobObj common.Job
 	if putResp.PrevKv != nil {
 		// 对旧值做一个反序列化
 		if err = json.Unmarshal(putResp.PrevKv.Value, &oldJobObj); err != nil {
@@ -81,26 +74,23 @@ func (jm *jobMgr) SaveJob(job *common.Job) (oldJob *common.Job, err error) {
 		}
 		oldJob = &oldJobObj
 	}
+
 	return
 }
 
 // 删除任务
 func (jm *jobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
-	var (
-		jobKey    string
-		delResp   *clientv3.DeleteResponse
-		oldJobObj common.Job
-	)
-
 	// etcd中保存任务的key
-	jobKey = common.JOB_SAVE_DIR + name
+	jobKey := common.JOB_SAVE_DIR + name
 
 	// 从etcd中删除它
-	if delResp, err = jm.kv.Delete(context.TODO(), jobKey, clientv3.WithPrevKV()); err != nil {
+	delResp, err := jm.kv.Delete(context.TODO(), jobKey, clientv3.WithPrevKV())
+	if err != nil {
 		return
 	}
 
 	// 返回被删除的任务信息
+	var oldJobObj common.Job
 	if len(delResp.PrevKvs) != 0 {
 		// 解析一下旧值, 返回它
 		if err = json.Unmarshal(delResp.PrevKvs[0].Value, &oldJobObj); err != nil {
@@ -109,23 +99,18 @@ func (jm *jobMgr) DeleteJob(name string) (oldJob *common.Job, err error) {
 		}
 		oldJob = &oldJobObj
 	}
+
 	return
 }
 
 // 列举任务
 func (jm *jobMgr) ListJobs() (jobList []*common.Job, err error) {
-	var (
-		dirKey  string
-		getResp *clientv3.GetResponse
-		kvPair  *mvccpb.KeyValue
-		job     *common.Job
-	)
-
 	// 任务保存的目录
-	dirKey = common.JOB_SAVE_DIR
+	dirKey := common.JOB_SAVE_DIR
 
 	// 获取目录下所有任务信息
-	if getResp, err = jm.kv.Get(context.TODO(), dirKey, clientv3.WithPrefix()); err != nil {
+	getResp, err := jm.kv.Get(context.TODO(), dirKey, clientv3.WithPrefix())
+	if err != nil {
 		return
 	}
 
@@ -134,7 +119,8 @@ func (jm *jobMgr) ListJobs() (jobList []*common.Job, err error) {
 	// len(jobList) == 0
 
 	// 遍历所有任务, 进行反序列化
-	for _, kvPair = range getResp.Kvs {
+	var job *common.Job
+	for _, kvPair := range getResp.Kvs {
 		job = &common.Job{}
 		if err = json.Unmarshal(kvPair.Value, job); err != nil {
 			err = nil
@@ -148,26 +134,20 @@ func (jm *jobMgr) ListJobs() (jobList []*common.Job, err error) {
 // 杀死任务
 func (jm *jobMgr) KillJob(name string) (err error) {
 	// 更新一下key=/cron/killer/任务名
-	var (
-		killerKey      string
-		leaseGrantResp *clientv3.LeaseGrantResponse
-		leaseId        clientv3.LeaseID
-	)
 
 	// 通知worker杀死对应任务
-	killerKey = common.JOB_KILLER_DIR + name
+	killerKey := common.JOB_KILLER_DIR + name
 
 	// 让worker监听到一次put操作, 创建一个租约让其稍后自动过期即可
-	if leaseGrantResp, err = jm.lease.Grant(context.TODO(), 1); err != nil {
+	grant, err := jm.lease.Grant(context.TODO(), 1)
+	if err != nil {
 		return
 	}
-
-	// 租约ID
-	leaseId = leaseGrantResp.ID
 
 	// 设置killer标记
-	if _, err = jm.kv.Put(context.TODO(), killerKey, "", clientv3.WithLease(leaseId)); err != nil {
+	if _, err = jm.kv.Put(context.TODO(), killerKey, "", clientv3.WithLease(grant.ID)); err != nil {
 		return
 	}
+
 	return
 }

@@ -202,7 +202,7 @@
             $("#job-list").on("click", ".kill-job", function(event) {
                 var jobName = $(this).parents("tr").children(".job-name").text()
                 $.ajax({
-                    url: '/job/kill',
+                    url: '/killer',
                     type: 'post',
                     dataType: 'json',
                     data: {
@@ -221,7 +221,7 @@
                     cronExpr: $('#edit-cronExpr').val()
                 }
                 $.ajax({
-                    url: '/job/save',
+                    url: '/job',
                     type: 'post',
                     dataType: 'json',
                     data: {
@@ -249,7 +249,7 @@
 
                 // 请求/job/log接口
                 $.ajax({
-                    url: "/job/log",
+                    url: "/log",
                     dataType: 'json',
                     data: {
                         name: jobName
@@ -287,7 +287,7 @@
 
                 // 拉取节点
                 $.ajax({
-                    url: '/worker/list',
+                    url: '/worker',
                     dataType: 'json',
                     success: function(resp) {
                         if (resp.errno != 0) {
@@ -313,7 +313,7 @@
             function rebuildJobList() {
                 // /job/list
                 $.ajax({
-                    url: '/job/list',
+                    url: '/job',
                     dataType: 'json',
                     success: function(resp) {
                         if (resp.errno != 0) { // 服务端出错了
