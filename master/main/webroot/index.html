@@ -187,11 +187,11 @@
             $("#job-list").on("click", ".delete-job", function(event) { // javascript bind
                 var jobName = $(this).parents("tr").children(".job-name").text()
                 $.ajax({
-                    url: '/job/delete',
-                    type: 'post',
+                    url: '/job',
+                    type: 'delete',
                     dataType: 'json',
                     data: {
-                        name: jobName
+                        job: jobName
                     },
                     complete: function() {
                         window.location.reload()
@@ -311,7 +311,6 @@
 
             // 2，定义一个函数，用于刷新任务列表
             function rebuildJobList() {
-                // /job/list
                 $.ajax({
                     url: '/job',
                     dataType: 'json',
